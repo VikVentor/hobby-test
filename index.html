@@ -83,44 +83,23 @@ SPDX-License-Identifier: MPL-2.0
                 </div>
 
                 <!-- ▼▼ NEW MAPPING UI ▼▼ -->
+              
                 <div class="container container-right">
-                    <div class="recent-scans-title-container">
-                        <h2 class="recent-scans-title">Label Position Map</h2>
-                    </div>
+                  <div class="recent-scans-title-container">
+                    <h2 class="recent-scans-title">Stored Label Map</h2>
+                  </div>
+                <ul id="labelMapList" style="font-size:14px; padding-left:14px;"></ul>
+              </div>
+              <hr>
+              <div style="margin-top:6px;">
+                <input id="newLabelInput" placeholder="new label" style="width:120px;">
+                  <button onclick="addLabel()">Add</button>
+              </div>
 
-                    <div style="display:flex;flex-direction:column;gap:8px;">
-                        <div>
-                            esp32 →
-                            <select onchange="updateMap('esp32', this.value)">
-                                <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
-                            </select>
-                        </div>
-                        <div>
-                            servo →
-                            <select onchange="updateMap('servo', this.value)">
-                                <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
-                            </select>
-                        </div>
-                        <div>
-                            motor →
-                            <select onchange="updateMap('motor', this.value)">
-                                <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
-                            </select>
-                        </div>
-                        <div>
-                            wheel →
-                            <select onchange="updateMap('wheel', this.value)">
-                                <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
-                            </select>
-                        </div>
-                        <div>
-                            sensor →
-                            <select onchange="updateMap('sensor', this.value)">
-                                <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+              <div style="margin-top:6px;">
+                <input id="removeLabelInput" placeholder="label to remove" style="width:120px;">
+                  <button onclick="removeLabel()">Remove</button>
+              </div>
                 <!-- ▲▲ NEW MAPPING UI ▲▲ -->
 
             </div>
@@ -128,6 +107,8 @@ SPDX-License-Identifier: MPL-2.0
 
         <div id="error-container" class="error-message" style="display: none;"></div>
     </div>
+
+    
 
     <script>
         const iframe = document.getElementById('dynamicIframe');
@@ -160,6 +141,7 @@ SPDX-License-Identifier: MPL-2.0
     <script>
     function updateMap(label, pos) {
         socket.emit("update_map", {label: label, pos: parseInt(pos)});
+        setTimeout(loadLabelMap, 500); // ✅ refresh UI after save
     }
     </script>
 
