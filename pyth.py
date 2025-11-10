@@ -7,11 +7,18 @@ from arduino.app_utils import App
 from arduino.app_bricks.web_ui import WebUI
 from arduino.app_bricks.video_objectdetection import VideoObjectDetection
 from datetime import datetime, UTC
+import os
+import json
+
+
+
 
 ui = WebUI()
 detection_stream = VideoObjectDetection(confidence=0.5, debounce_sec=0.0)
 
 paused = False
+MAP_FILE = os.path.join(os.path.dirname(__file__), "label_map.json")
+#print("Saving to:", os.path.abspath(MAP_FILE))
 
 label_map = {
     "esp32": 1,
@@ -21,6 +28,15 @@ label_map = {
     "sensor": 5
 }
 
+# Load saved map on startup
+try:
+    with open(MAP_FILE, "r") as f:
+        saved_map = json.load(f)
+        for k in saved_map:
+            label_map[k] = saved_map[k]
+except FileNotFoundError:
+    pass
+
 ui.on_message("override_th", lambda sid, threshold: detection_stream.override_threshold(threshold))
 
 def update_map(data: dict):
@@ -28,7 +44,10 @@ def update_map(data: dict):
     pos = data.get("pos")
     if label in label_map:
         label_map[label] = int(pos)
-        print(f"mapping updated: {label} -> {pos}")
+        # Save updated map
+        with open(MAP_FILE, "w") as f:
+            json.dump(label_map, f)
+        print(f"mapping updated and saved: {label} -> {pos}")
 
 ui.on_message("update_map", lambda sid, data: update_map(data))
 
