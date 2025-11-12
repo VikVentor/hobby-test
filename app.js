@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeConfidenceSlider();
     updateFeedback(null);
     renderDetections();
-    loadLabelMap();
 
     // Popover logic
     const confidencePopoverText = "Minimum confidence score for detected objects. Lower values show more results but may include false positives.";
@@ -67,33 +66,6 @@ function initSocketIO() {
 
 }
 
-function updateFeedback(detection) {
-    const objectInfo = {
-        "cat": { text: "Meow!", gif: "cat.webp" },
-        "cell phone": { text: "Stay connected", gif: "phone.webp" },
-        "clock": { text: "Time to go", gif: "clock.webp" },
-        "cup": { text: "Need a break?", gif: "cup.webp" },
-        "dog": { text: "Walkies?", gif: "dog.webp" },
-        "potted plant": { text: "Glow your ideas!", gif: "plant.webp" }
-    };
-
-    if (detection && objectInfo[detection.content]) {
-        const info = objectInfo[detection.content];
-        const confidence = Math.floor(detection.confidence * 100);
-        feedbackContentElement.innerHTML = `
-            <div class="feedback-detection">
-                <div class="percentage">${confidence}%</div>
-                <img src="img/${info.gif}" alt="${detection.content}">
-                <p>${info.text}</p>
-            </div>
-        `;
-    } else {
-        feedbackContentElement.innerHTML = `
-            <img src="img/stars.svg" alt="Stars">
-            <p class="feedback-text">System response will appear here</p>
-        `;
-    }
-}
 
 function printDetection(newDetection) {
     scans.unshift(newDetection);
@@ -143,120 +115,5 @@ function renderDetections() {
         recentDetectionsElement.appendChild(row);
     });
 }
-
-
-function initializeConfidenceSlider() {
-    const confidenceSlider = document.getElementById('confidenceSlider');
-    const confidenceInput = document.getElementById('confidenceInput');
-    const confidenceResetButton = document.getElementById('confidenceResetButton');
-
-    confidenceSlider.addEventListener('input', updateConfidenceDisplay);
-    confidenceInput.addEventListener('input', handleConfidenceInputChange);
-    confidenceInput.addEventListener('blur', validateConfidenceInput);
-    updateConfidenceDisplay();
-
-    confidenceResetButton.addEventListener('click', (e) => {
-        if (e.target.classList.contains('reset-icon') || e.target.closest('.reset-icon')) {
-            resetConfidence();
-        }
-    });
-}
-
-function handleConfidenceInputChange() {
-    const confidenceInput = document.getElementById('confidenceInput');
-    const confidenceSlider = document.getElementById('confidenceSlider');
-
-    let value = parseFloat(confidenceInput.value);
-
-    if (isNaN(value)) value = 0.5;
-    if (value < 0) value = 0;
-    if (value > 1) value = 1;
-
-    confidenceSlider.value = value;
-    updateConfidenceDisplay();
-}
-
-function validateConfidenceInput() {
-    const confidenceInput = document.getElementById('confidenceInput');
-    let value = parseFloat(confidenceInput.value);
-
-    if (isNaN(value)) value = 0.5;
-    if (value < 0) value = 0;
-    if (value > 1) value = 1;
-
-    confidenceInput.value = value.toFixed(2);
-
-    handleConfidenceInputChange();
-}
-
-function updateConfidenceDisplay() {
-    const confidenceSlider = document.getElementById('confidenceSlider');
-    const confidenceInput = document.getElementById('confidenceInput');
-    const confidenceValueDisplay = document.getElementById('confidenceValueDisplay');
-    const sliderProgress = document.getElementById('sliderProgress');
-
-    const value = parseFloat(confidenceSlider.value);
-    socket.emit('override_th', value); // Send confidence to backend
-    const percentage = (value - confidenceSlider.min) / (confidenceSlider.max - confidenceSlider.min) * 100;
-
-    const displayValue = value.toFixed(2);
-    confidenceValueDisplay.textContent = displayValue;
-
-    if (document.activeElement !== confidenceInput) {
-        confidenceInput.value = displayValue;
-    }
-
-    sliderProgress.style.width = percentage + '%';
-    confidenceValueDisplay.style.left = percentage + '%';
-}
-
-function resetConfidence() {
-    const confidenceSlider = document.getElementById('confidenceSlider');
-    const confidenceInput = document.getElementById('confidenceInput');
-
-    confidenceSlider.value = '0.5';
-    confidenceInput.value = '0.50';
-    updateConfidenceDisplay();
-}
-
-
-
-async function loadLabelMap() {
-    try {
-        const response = await fetch("./label_map.json");
-        const json = await response.json();
-        const list = document.getElementById("labelMapList");
-
-        list.innerHTML = "";
-
-        Object.keys(json).forEach(k => {
-            const li = document.createElement("li");
-            li.style.marginBottom = "4px";
-            li.textContent = `${k} → ${json[k]}`;
-            list.appendChild(li);
-        });
-        
-    } catch (err) {
-        console.error("Failed to load label_map.json:", err);
-    }
-}
-
-function addLabel() {
-    const label = document.getElementById("newLabelInput").value.trim();
-    if (!label) return;
-
-    socket.emit("add_label", { label: label });
-    setTimeout(loadLabelMap, 500);
-}
-
-function removeLabel() {
-    const label = document.getElementById("removeLabelInput").value.trim();
-    if (!label) return;
-
-    socket.emit("remove_label", { label: label });
-    setTimeout(loadLabelMap, 500);
-}
-
-
 
 
