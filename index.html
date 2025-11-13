@@ -12,64 +12,70 @@ SPDX-License-Identifier: MPL-2.0
     <link rel="stylesheet" href="style.css">
 
     <style>
-    .main-content {
-        display: flex;
-        justify-content: space-around;
-        align-items: flex-start;
-        gap: 20px;
-        padding: 0 30px;
-    }
+        .main-content {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            gap: 20px;
+            padding: 0 30px;
+        }
 
-    #video-container {
-        flex: 2;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
+        #video-container {
+            flex: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
 
-    iframe {
-        max-width: 800px;
-        width: 100%;
-        height: 600px;
-        border-radius: 10px;
-    }
+        iframe {
+            width: 360px;
+            height: 360px;
+            border-radius: 10px;
+            image-rendering: pixelated;
+        }
 
-    #label-list {
-        flex: 0.8;
-        background-color: #f6f6f6;
-        border-radius: 10px;
-        padding: 15px;
-        font-family: inherit;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    }
+        #label-list {
+            flex: 0.8;
+            background-color: #f6f6f6;
+            border-radius: 10px;
+            padding: 15px;
+            font-family: inherit;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
 
-    #label-list h2 {
-        margin-top: 0;
-        color: #00979d;
-        font-size: 1.2em;
-        text-align: center;
-    }
+        #label-list h2 {
+            margin-top: 0;
+            color: #00979d;
+            font-size: 1.2em;
+            text-align: center;
+        }
 
-    select, button {
-        width: 100%;
-        padding: 8px;
-        font-size: 1em;
-        margin-top: 10px;
-        border-radius: 6px;
-    }
+        select, button {
+            width: 100%;
+            padding: 8px;
+            font-size: 1em;
+            margin-top: 10px;
+            border-radius: 6px;
+        }
 
-    button {
-        background-color: #00979d;
-        color: white;
-        border: none;
-        cursor: pointer;
-    }
+        button {
+            background-color: #00979d;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
 
-    button:hover {
-        background-color: #007b7f;
-    }
-</style>
+        button:hover {
+            background-color: #007b7f;
+        }
 
+        #modeStatus {
+            text-align: center;
+            color: #00979d;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
@@ -84,7 +90,7 @@ SPDX-License-Identifier: MPL-2.0
                     <img src="./img/no-face.svg" alt="Searching webcam">
                     <p class="feedback-text">Searching Webcam...</p>
                 </div>
-                <iframe id="dynamicIframe" title="Video stream" width="1024px" height="768px" frameBorder="0" style="display:none;"></iframe>
+                <iframe id="dynamicIframe" title="Video stream" width="90" height="90" frameBorder="0" style="display:none;"></iframe>
             </div>
         </div>
 
@@ -94,6 +100,8 @@ SPDX-License-Identifier: MPL-2.0
                 <option value="">-- Select a label --</option>
             </select>
             <button id="findButton">Find</button>
+            <button id="pickButton">Pick Items</button>
+            <p id="modeStatus">Mode: Normal</p>
         </div>
     </div>
 
@@ -116,20 +124,18 @@ SPDX-License-Identifier: MPL-2.0
         const startLoading = () => { iframe.src = streamUrl; };
         intervalId = setInterval(startLoading, 1000);
 
-        // Populate dropdown
         fetch('label_map.json')
             .then(response => response.json())
             .then(data => {
                 const select = document.getElementById('labelSelect');
-                Object.entries(data).forEach(([label, number]) => {
+                Object.entries(data).forEach(([label, values]) => {
                     const option = document.createElement('option');
                     option.value = label;
-                    option.textContent = `${label} (${number})`;
+                    option.textContent = `${label} (${values[0]})`;
                     select.appendChild(option);
                 });
             });
 
-        // Send selected label via socket
         document.getElementById('findButton').addEventListener('click', () => {
             const selectedLabel = document.getElementById('labelSelect').value;
             if (!selectedLabel) {
@@ -138,6 +144,15 @@ SPDX-License-Identifier: MPL-2.0
             }
             socket.emit('find', { label: selectedLabel });
             console.log('Find sent for', selectedLabel);
+        });
+
+        document.getElementById('pickButton').addEventListener('click', () => {
+            socket.emit('toggle_pick', {});
+        });
+
+        socket.on('mode_status', (data) => {
+            const modeStatus = document.getElementById('modeStatus');
+            modeStatus.textContent = `Mode: ${data.mode}`;
         });
     </script>
 
