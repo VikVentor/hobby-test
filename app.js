@@ -116,4 +116,14 @@ function renderDetections() {
     });
 }
 
+document.getElementById('pickButton').addEventListener('click', () => {
+    socket.emit('toggle_pick', {});
+});
+
+// Listen for mode change messages
+socket.on('mode_status', (data) => {
+    const modeStatus = document.getElementById('modeStatus');
+    modeStatus.textContent = `Mode: ${data.mode}`;
+});
+
 
