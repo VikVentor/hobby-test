@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (C) 2025 ARDUINO SA <http://www.arduino.cc>
+# SPDX-FileCopyrightText: Copyright (C) 2025 ARDUINO SA
 #
 # SPDX-License-Identifier: MPL-2.0
 
@@ -13,38 +13,72 @@ import os
 
 ui = WebUI()
 detection_stream = VideoObjectDetection(confidence=0.5, debounce_sec=0.0)
+ui.on_message("override_th", lambda sid, threshold: detection_stream.override_threshold(threshold))
+
+paused = False
+pick_mode = False
+last_detection_time = {}
+DETECTION_COOLDOWN = 2.0  # seconds between same detections
+
+label_map_path = os.path.join(os.path.dirname(__file__), "..", "assets", "label_map.json")
+with open(label_map_path, "r") as f:
+    label_map = json.load(f)
+
+def save_label_map():
+    with open(label_map_path, "w") as f:
+        json.dump(label_map, f, indent=2)
 
 def handle_find(label):
     print(f"Find triggered for label: {label}")
     if label in label_map:
-        print("sending ", label_map[label])
-        Bridge.notify("stepper", label_map[label])
+        print("sending ", label_map[label][0])
+        Bridge.notify("stepper", label_map[label][0])
 
 ui.on_message("find", lambda sid, data: handle_find(data["label"]))
 
+def toggle_pick_mode(sid, data):
+    global pick_mode, paused
+    pick_mode = not pick_mode
+    paused = False  # ensure detections resume when switching modes
+    mode_msg = "Entered pick mode" if pick_mode else "Entered normal mode"
+    print(mode_msg)
+    ui.send_message("mode_status", {"mode": mode_msg})
 
-paused = False
-
-label_map_path = os.path.join(os.path.dirname(__file__), "..", "assets", "label_map.json")
-print(label_map_path)
-with open(label_map_path, "r") as f:
-    label_map = json.load(f)
-
-ui.on_message("override_th", lambda sid, threshold: detection_stream.override_threshold(threshold))
+ui.on_message("toggle_pick", toggle_pick_mode)
 
 def send_detections_to_ui(detections: dict):
-    global paused
+    global paused, pick_mode
+    current_time = time.time()
+
     if paused:
         return
+
     for key, value in detections.items():
-        ui.send_message("detection", {
-            "content": key,
-            "confidence": value.get("confidence"),
-            "timestamp": datetime.now(UTC).isoformat()
-        })
-        if value.get("confidence") * 100 > 85 and key in label_map:
-            paused = True
-            Bridge.notify("stepper", label_map[key])
+        conf = value.get("confidence", 0)
+        if conf * 100 < 85 or key not in label_map:
+            continue
+
+        last_time = last_detection_time.get(key, 0)
+        if current_time - last_time < DETECTION_COOLDOWN:
+            continue
+
+        last_detection_time[key] = current_time
+
+        if pick_mode:
+            label_map[key][1] = max(0, label_map[key][1] - 1)
+        else:
+            label_map[key][1] += 1
+            Bridge.notify("stepper", label_map[key][0])
+            paused = True  # <-- pause until other device sends ack
+            print("sending ", label_map[key][0], "using bridge")
+
+        save_label_map()
+        ui.send_message("count_update", {"label": key, "count": label_map[key][1]})
+        print(f"{'Picked' if pick_mode else 'Added'} {key}: {label_map[key][1]}")
+
+
+
+detection_stream.on_detect_all(send_detections_to_ui)
 
 def resume(val: int):
     global paused
@@ -52,6 +86,5 @@ def resume(val: int):
         paused = False
 
 Bridge.provide("ack", resume)
-detection_stream.on_detect_all(send_detections_to_ui)
 
 App.run()
