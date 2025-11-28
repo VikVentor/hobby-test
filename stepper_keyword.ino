@@ -1,56 +1,85 @@
-#include <AccelStepper.h>
 #include <Arduino_RouterBridge.h>
+#include <AccelStepper.h>
 
-// Define CNC Shield pins for X-axis
-#define X_STEP_PIN 2
-#define X_DIR_PIN 5
+#define STEP_PIN 2
+#define DIR_PIN 5
 #define ENABLE_PIN 8
+#define LIMIT_PIN 9
+#define SERVO_PIN 11
 
-// Create an AccelStepper object in DRIVER mode (step + direction)
-AccelStepper stepperX(AccelStepper::DRIVER, X_STEP_PIN, X_DIR_PIN);
+AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
 
-// Motion control flags
-bool isMoving = false;
-bool returning = false;
+bool homed = false;
+long positions[6] = {0, 33, 66, 99, 132, 165};
+
+void pwmServo(int deg) {
+    int pulse = map(deg, 0, 180, 1000, 2000);
+    digitalWrite(SERVO_PIN, HIGH);
+    delayMicroseconds(pulse);
+    digitalWrite(SERVO_PIN, LOW);
+    delayMicroseconds(20000 - pulse);
+}
+
+void moveServo(int deg) {
+    for (int i = 0; i < 50; i++)
+        pwmServo(deg);
+}
+
+void servoDrop() {
+    moveServo(35);
+    delay(2000);
+    moveServo(75);
+}
+
+void movePos(int n) {
+    if (n < 1 || n > 6) return;
+    delay(2000);
+
+    long target = positions[n - 1];
+    Monitor.println("moving stepper");
+    stepper.moveTo(target);
+
+    while (stepper.distanceToGo() != 0)
+        stepper.run();
+
+    servoDrop();
+
+    int var = 0;
+    Monitor.println("sending ack");
+
+    stepper.moveTo(10);
+    while (stepper.distanceToGo() != 0)
+        stepper.run();
+
+    Bridge.notify("ack", var);
+}
 
 void setup() {
-  pinMode(ENABLE_PIN, OUTPUT);
-  digitalWrite(ENABLE_PIN, LOW); // enable driver
-  Bridge.begin();
-  Bridge.provide("keyword_detected", startMove);
+    pinMode(ENABLE_PIN, OUTPUT);
+    digitalWrite(ENABLE_PIN, LOW);
+    pinMode(LIMIT_PIN, INPUT_PULLUP);
+    pinMode(SERVO_PIN, OUTPUT);
 
-  stepperX.setMaxSpeed(1000);
-  stepperX.setAcceleration(200);
+    Bridge.begin();
+    Monitor.begin(115200);
+
+    stepper.setMaxSpeed(1000);
+    stepper.setAcceleration(1000);
+
+    while (!homed) {
+        if (digitalRead(LIMIT_PIN) == HIGH) {
+            stepper.stop();
+            stepper.setCurrentPosition(0);
+            homed = true;
+        } else {
+            stepper.setSpeed(-50);
+            stepper.runSpeed();
+        }
+    }
+
+    servoDrop();
 }
 
 void loop() {
-  if (isMoving) {
-    stepperX.run();
-
-    // When we reach the target
-    if (stepperX.distanceToGo() == 0) {
-      if (!returning) {
-        // Finished forward move — now go back
-        returning = true;
-        delay(500); // small pause at the end
-        stepperX.moveTo(0);
-      } else {
-        // Finished returning — done!
-        isMoving = false;
-        returning = false;
-        digitalWrite(ENABLE_PIN, HIGH); // optional: disable driver to save power
-      }
-    }
-  }
-}
-
-// Called when keyword is detected
-void startMove() {
-  // Only trigger if not already moving
-  if (!isMoving) {
-    digitalWrite(ENABLE_PIN, LOW); // ensure driver is enabled
-    stepperX.moveTo(1000);
-    isMoving = true;
-    returning = false;
-  }
+    Bridge.provide("stepper", movePos);
 }
