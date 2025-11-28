@@ -1,5 +1,6 @@
 #include <Arduino_RouterBridge.h>
 #include <AccelStepper.h>
+#include <Servo.h>
 
 #define STEP_PIN 2
 #define DIR_PIN 5
@@ -8,27 +9,16 @@
 #define SERVO_PIN 11
 
 AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
+Servo myservo;
 
 bool homed = false;
 long positions[6] = {0, 33, 66, 99, 132, 165};
 
-void pwmServo(int deg) {
-    int pulse = map(deg, 0, 180, 1000, 2000);
-    digitalWrite(SERVO_PIN, HIGH);
-    delayMicroseconds(pulse);
-    digitalWrite(SERVO_PIN, LOW);
-    delayMicroseconds(20000 - pulse);
-}
-
-void moveServo(int deg) {
-    for (int i = 0; i < 50; i++)
-        pwmServo(deg);
-}
-
 void servoDrop() {
-    moveServo(35);
+    myservo.write(35);
     delay(2000);
-    moveServo(75);
+    myservo.write(75);
+    delay(500);
 }
 
 void movePos(int n) {
@@ -58,10 +48,11 @@ void setup() {
     pinMode(ENABLE_PIN, OUTPUT);
     digitalWrite(ENABLE_PIN, LOW);
     pinMode(LIMIT_PIN, INPUT_PULLUP);
-    pinMode(SERVO_PIN, OUTPUT);
 
     Bridge.begin();
     Monitor.begin(115200);
+
+    myservo.attach(SERVO_PIN);
 
     stepper.setMaxSpeed(1000);
     stepper.setAcceleration(1000);
